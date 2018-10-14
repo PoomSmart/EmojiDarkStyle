@@ -63,7 +63,7 @@ static NSString *emojiCategoryImagePath(UIKeyboardEmojiGraphics *self, UIKeyboar
 %hook UIKeyboardEmojiGraphics
 
 %new
-+ (NSString *)emojiCategoryImagePath: (UIKeyboardEmojiCategory *)category forRenderConfig: (UIKBRenderConfig *)renderConfig {
++ (NSString *)emojiCategoryImagePath:(UIKeyboardEmojiCategory *)category forRenderConfig:(UIKBRenderConfig *)renderConfig {
     return emojiCategoryImagePath(self, category, renderConfig);
 }
 
@@ -71,23 +71,19 @@ static NSString *emojiCategoryImagePath(UIKeyboardEmojiGraphics *self, UIKeyboar
 
 %hook UIKeyboardEmojiSplitCategoryPicker
 
-- (NSString *)symbolForRow: (NSInteger)row {
+- (NSString *)symbolForRow:(NSInteger)row {
     PSEmojiCategory categoryType = isiOS91Up ? [NSClassFromString(@"UIKeyboardEmojiCategory") categoryTypeForCategoryIndex:row] : row;
     return [NSClassFromString(@"UIKeyboardEmojiGraphics") emojiCategoryImagePath:[NSClassFromString(@"UIKeyboardEmojiCategory") categoryForType:categoryType] forRenderConfig:self.renderConfig];
 }
 
 %end
 
-%group iOS9Up
-
 %hook UIKeyboardEmojiCategoryBar
 
-- (void)prepareForDisplay {
+- (void)setNeedsDisplay {
     %orig;
     prepareForDisplay(self);
 }
-
-%end
 
 %end
 
@@ -96,7 +92,7 @@ static NSString *emojiCategoryImagePath(UIKeyboardEmojiGraphics *self, UIKeyboar
 %hook UIKeyboardEmojiGraphics
 
 %new
-+ (NSString *)emojiCategoryImagePath: (UIKeyboardEmojiCategory *)category {
++ (NSString *)emojiCategoryImagePath:(UIKeyboardEmojiCategory *)category {
     PSEmojiCategory categoryType = category.categoryType;
     NSString *name = nil;
     switch (categoryType) {
@@ -135,21 +131,6 @@ static NSString *emojiCategoryImagePath(UIKeyboardEmojiGraphics *self, UIKeyboar
 
 %end
 
-%group preiOS9
-
-%hook UIKeyboardEmojiCategoryBar
-
-- (void)setNeedsDisplay {
-    %orig;
-    prepareForDisplay(self);
-}
-
-%end
-
-%end
-
-%group iOS91Up
-
 static NSArray *_darkIcons;
 static NSMutableArray *darkIcons() {
     NSMutableArray *array = [NSMutableArray arrayWithCapacity:7];
@@ -170,29 +151,19 @@ extern "C" UIImage *_UIImageWithName(NSString *name);
     return %orig;
 }
 
-%end
-
 %ctor {
     if (_isTarget(TargetTypeGUINoExtension, @[@"com.apple.mobilesms.compose", @"com.apple.MobileSMS.MessagesNotificationExtension"])) {
         iOS91Up = isiOS91Up;
 #if TARGET_OS_SIMULATOR
         if (!iOS91Up)
-            dlopen("/opt/simject/EmojiResources.dylib", RTLD_LAZY);
+            dlopen("/opt/simject/EmojiResources.dylib", RTLD_LAZY | RTLD_GLOBAL);
 #else
         dlopen("/Library/MobileSubstrate/DynamicLibraries/EmojiResources.dylib", RTLD_LAZY);
 #endif
-        if (isiOS9Up) {
-            %init(iOS9Up);
-            if (iOS91Up) {
-                _darkIcons = [darkIcons() retain];
-                %init(iOS91Up);
-            }
-        } else {
-            %init(preiOS9);
-            if (!isiOS83Up) {
-                %init(preiOS83);
-            }
+        if (!isiOS83Up) {
+            %init(preiOS83);
         }
+        _darkIcons = [darkIcons() retain];
         %init;
     }
 }

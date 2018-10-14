@@ -5,7 +5,7 @@ else
 	TARGET = iphone:clang:latest:7.0
 endif
 
-PACKAGE_VERSION = 1.0.4
+PACKAGE_VERSION = 1.0.5
 
 include $(THEOS)/makefiles/common.mk
 
@@ -15,7 +15,7 @@ ZEmojiDarkStyle_USE_SUBSTRATE = 1
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 
-all::
+setup:: clean all
 ifeq ($(SIMULATOR),1)
 	@rm -f /opt/simject/$(TWEAK_NAME).dylib
 	@cp -v $(THEOS_OBJ_DIR)/$(TWEAK_NAME).dylib /opt/simject
