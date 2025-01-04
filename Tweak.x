@@ -1,31 +1,37 @@
 #define CHECK_TARGET
-#define CHECK_EXCEPTIONS
-#import "../EmojiLibrary/Header.h"
-#import "../PS.h"
+#import <EmojiLibrary/Header.h>
 #import <UIKit/UIImage+Private.h>
+#import <PSHeader/PS.h>
+#import <dlfcn.h>
 #import <substrate.h>
+#import <version.h>
 
 static BOOL iOS91Up;
 
 static void prepareForDisplay(UIKeyboardEmojiCategoryBar *self) {
-    NSMutableArray *categories = [NSClassFromString(@"UIKeyboardEmojiCategory") categories];
-    NSUInteger count = iOS91Up ? [NSClassFromString(@"UIKeyboardEmojiCategory") enabledCategoryIndexes].count : categories.count;
+    Class UIKeyboardEmojiCategoryClass = %c(UIKeyboardEmojiCategory);
+    NSMutableArray *categories = [UIKeyboardEmojiCategoryClass categories];
+    NSUInteger count = iOS91Up ? [UIKeyboardEmojiCategoryClass enabledCategoryIndexes].count : categories.count;
     NSMutableArray <UIKBTree *> *array = [NSMutableArray arrayWithCapacity:count];
-    for (NSUInteger idx = 0; idx < count; idx++) {
+    for (NSUInteger idx = 0; idx < count; ++idx) {
         UIKBTree *tree = [[UIKBTree alloc] initWithType:8];
-        NSUInteger realIdx = iOS91Up ? [NSClassFromString(@"UIKeyboardEmojiCategory") categoryTypeForCategoryIndex:idx] : idx;
-        tree.displayString = [NSClassFromString(@"UIKeyboardEmojiGraphics") emojiCategoryImagePath:categories[realIdx] forRenderConfig:self.renderConfig];
-        [array addObject:[tree autorelease]];
+        NSUInteger realIdx = iOS91Up ? [UIKeyboardEmojiCategoryClass categoryTypeForCategoryIndex:idx] : idx;
+        tree.displayString = [%c(UIKeyboardEmojiGraphics) emojiCategoryImagePath:categories[realIdx] forRenderConfig:self.renderConfig];
+        [array addObject:tree];
     }
-    MSHookIvar<UIKBTree *>(self, "m_key").subtrees = array;
+    UIKBTree *tree = [self valueForKey:@"m_key"];
+    tree.subtrees = array;
 }
 
-static NSString *emojiCategoryImagePath(UIKeyboardEmojiGraphics *self, UIKeyboardEmojiCategory *category, UIKBRenderConfig *renderConfig) {
+static NSString *emojiCategoryImagePath(Class UIKeyboardEmojiGraphics, UIKeyboardEmojiCategory *category, UIKBRenderConfig *renderConfig) {
     if (renderConfig.lightKeyboard)
-        return [[self class] emojiCategoryImagePath:category];
+        return [UIKeyboardEmojiGraphics emojiCategoryImagePath:category];
     PSEmojiCategory categoryType = category.categoryType;
     NSString *name = nil;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch"
     switch (categoryType) {
+#pragma clang diagnostic pop
         case PSEmojiCategoryPeople:
             name = @"emoji_people_dark.png";
             break;
@@ -57,12 +63,12 @@ static NSString *emojiCategoryImagePath(UIKeyboardEmojiGraphics *self, UIKeyboar
             name = @"emoji_flags_dark.png";
             break;
     }
-    return name ? name : [[self class] emojiCategoryImagePath:category];
+    return name ? name : [UIKeyboardEmojiGraphics emojiCategoryImagePath:category];
 }
 
 %hook UIKeyboardEmojiGraphics
 
-%new
+%new(@@:@@)
 + (NSString *)emojiCategoryImagePath:(UIKeyboardEmojiCategory *)category forRenderConfig:(UIKBRenderConfig *)renderConfig {
     return emojiCategoryImagePath(self, category, renderConfig);
 }
@@ -72,8 +78,8 @@ static NSString *emojiCategoryImagePath(UIKeyboardEmojiGraphics *self, UIKeyboar
 %hook UIKeyboardEmojiSplitCategoryPicker
 
 - (NSString *)symbolForRow:(NSInteger)row {
-    PSEmojiCategory categoryType = isiOS91Up ? [NSClassFromString(@"UIKeyboardEmojiCategory") categoryTypeForCategoryIndex:row] : row;
-    return [NSClassFromString(@"UIKeyboardEmojiGraphics") emojiCategoryImagePath:[NSClassFromString(@"UIKeyboardEmojiCategory") categoryForType:categoryType] forRenderConfig:self.renderConfig];
+    PSEmojiCategory categoryType = iOS91Up ? [%c(UIKeyboardEmojiCategory) categoryTypeForCategoryIndex:row] : row;
+    return [%c(UIKeyboardEmojiGraphics) emojiCategoryImagePath:[%c(UIKeyboardEmojiCategory) categoryForType:categoryType] forRenderConfig:self.renderConfig];
 }
 
 %end
@@ -91,11 +97,14 @@ static NSString *emojiCategoryImagePath(UIKeyboardEmojiGraphics *self, UIKeyboar
 
 %hook UIKeyboardEmojiGraphics
 
-%new
+%new(@@:@)
 + (NSString *)emojiCategoryImagePath:(UIKeyboardEmojiCategory *)category {
     PSEmojiCategory categoryType = category.categoryType;
     NSString *name = nil;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch"
     switch (categoryType) {
+#pragma clang diagnostic pop
         case IDXPSEmojiCategoryRecent:
             name = @"emoji_recents.png";
             break;
@@ -132,7 +141,7 @@ static NSString *emojiCategoryImagePath(UIKeyboardEmojiGraphics *self, UIKeyboar
 %end
 
 static NSArray *_darkIcons;
-static NSMutableArray *darkIcons() {
+static NSMutableArray <NSString *> *darkIcons() {
     NSMutableArray *array = [NSMutableArray arrayWithCapacity:7];
     [array addObject:@"emoji_people_dark.png"];
     [array addObject:@"emoji_nature_dark.png"];
@@ -144,7 +153,7 @@ static NSMutableArray *darkIcons() {
     return array;
 }
 
-extern "C" UIImage *_UIImageWithName(NSString *name);
+extern UIImage *_UIImageWithName(NSString *name);
 %hookf(UIImage *, _UIImageWithName, NSString *name) {
     if (name && [name hasPrefix:@"emoji_"] && [_darkIcons containsObject:name])
         return [UIImage imageNamed:name inBundle:[NSBundle bundleForClass:[UIApplication class]]];
@@ -152,18 +161,18 @@ extern "C" UIImage *_UIImageWithName(NSString *name);
 }
 
 %ctor {
-    if (_isTarget(TargetTypeGUINoExtension, @[@"com.apple.mobilesms.compose", @"com.apple.MobileSMS.MessagesNotificationExtension"])) {
-        iOS91Up = isiOS91Up;
+    if (isTarget(TargetTypeApps | TargetTypeGenericExtensions)) {
+        iOS91Up = IS_IOS_OR_NEWER(iOS_9_1);
 #if TARGET_OS_SIMULATOR
         if (!iOS91Up)
             dlopen("/opt/simject/EmojiResources.dylib", RTLD_LAZY | RTLD_GLOBAL);
 #else
         dlopen("/Library/MobileSubstrate/DynamicLibraries/EmojiResources.dylib", RTLD_LAZY);
 #endif
-        if (!isiOS83Up) {
+        if (!IS_IOS_OR_NEWER(iOS_8_3)) {
             %init(preiOS83);
         }
-        _darkIcons = [darkIcons() retain];
+        _darkIcons = darkIcons();
         %init;
     }
 }

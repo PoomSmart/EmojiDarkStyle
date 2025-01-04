@@ -3,15 +3,17 @@ ifeq ($(SIMULATOR),1)
 	ARCHS = x86_64 i386
 else
 	TARGET = iphone:clang:latest:7.0
+	ARCHS = armv7 arm64
 endif
 
-PACKAGE_VERSION = 1.0.5
+PACKAGE_VERSION = 1.0.7
 
 include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = ZEmojiDarkStyle
-ZEmojiDarkStyle_FILES = Tweak.xm
-ZEmojiDarkStyle_USE_SUBSTRATE = 1
+$(TWEAK_NAME)_FILES = Tweak.x
+$(TWEAK_NAME)_CFLAGS = -fobjc-arc
+$(TWEAK_NAME)_USE_SUBSTRATE = 1
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 

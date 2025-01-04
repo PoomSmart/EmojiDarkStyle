@@ -2,7 +2,7 @@ Package: com.ps.emojidarkstyle
 Name: EmojiDarkStyle
 Depends: mobilesubstrate, firmware (>= 7.0), firmware (<< 10.2)
 Conflicts: com.ps.emojiresourcesdark
-Version: 1.0
+Version: 1.0.0
 Architecture: iphoneos-arm
 Description: iOS 10.2+ dark emoji icons.
 Maintainer: PoomSmart
